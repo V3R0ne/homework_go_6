@@ -15,26 +15,58 @@ var (
 // название источника и true. Источник равен "left" или "right".
 // Закрытый выбранный канал даёт пустую строку, название источника и false.
 func FirstReady(left, right <-chan string) (string, string, bool) {
-	return "", "", false
+	select {
+	case v, ok := <-left:
+		if !ok {
+			return "", "left", ok
+		}
+		return v, "left", ok
+	case v, ok := <-right:
+		if !ok {
+			return "", "right", ok
+		}
+		return v, "right", ok
+	}
 }
 
 // TODO: TrySend должен попытаться отправить value без ожидания.
 // Если канал не готов принять значение, ветка default сразу возвращает false.
 func TrySend(out chan<- int, value int) bool {
-	return false
+	select {
+	case out <- value:
+		return true
+	default:
+		return false
+	}
 }
 
 // TODO: ReceiveOrTimeout должен вернуть значение из in, ErrClosed для закрытого in
 // или ErrTimeout, когда первым готов канал тайм-аута.
 func ReceiveOrTimeout(in <-chan string, timeout <-chan time.Time) (string, error) {
-	return "", nil
+	select {
+	case v, ok := <-in:
+		if !ok {
+			return "", ErrClosed
+		}
+		return v, nil
+	case <-timeout:
+		return "", ErrTimeout
+	}
 }
 
 // TODO: TryReceive должен попытаться получить одно число без ожидания.
 // Вернуть value, true только для реально полученного значения; nil, пустой
 // или закрытый канал дают 0, false.
 func TryReceive(in <-chan int) (int, bool) {
-	return 0, false
+	select {
+	case v, ok := <-in:
+		if !ok {
+			return 0, false
+		}
+		return v, true
+	default:
+		return 0, false
+	}
 }
 
 // TODO: PrimaryOrFallback должен сначала проверить основной канал primary без ожидания.
@@ -43,6 +75,30 @@ func TryReceive(in <-chan int) (int, bool) {
 // Закрытый вход отключается; когда оба входа закрыты или равны nil,
 // вернуть "", "", false.
 func PrimaryOrFallback(primary, fallback <-chan string) (string, string, bool) {
+	select {
+	case v, ok := <-primary:
+		if ok {
+			return v, "primary", ok
+		}
+		primary = nil
+	default:
+	}
+
+	for primary != nil || fallback != nil {
+		select {
+		case v, ok := <-primary:
+			if ok {
+				return v, "primary", ok
+			}
+			primary = nil
+		case v, ok := <-fallback:
+			if ok {
+				return v, "fallback", ok
+			}
+			fallback = nil
+		}
+	}
+
 	return "", "", false
 }
 
