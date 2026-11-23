@@ -11,35 +11,72 @@ var ErrClosed = errors.New("канал закрыт")
 // TODO: Check должен немедленно вернуть ctx.Err(), если context завершён,
 // и nil, если работа ещё разрешена.
 func Check(ctx context.Context) error {
-	return nil
+	return ctx.Err()
 }
 
 // TODO: WaitValue должен ждать значение или отмену context через select.
 // Закрытый канал возвращает ErrClosed.
 func WaitValue(ctx context.Context, values <-chan string) (string, error) {
-	return "", nil
+	select {
+	case v, ok := <-values:
+		if !ok {
+			return "", ErrClosed
+		}
+		return v, nil
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
 }
 
 // TODO: Process должен перед каждым элементом проверять ctx, затем применять fn.
 // При отмене вернуть уже накопленный результат и ctx.Err().
 // Если fn == nil, копировать значения без изменения.
 func Process(ctx context.Context, values []int, fn func(int) int) ([]int, error) {
-	return []int{}, nil
+	result := make([]int, 0)
+	for _, v := range values {
+		if ctx.Err() != nil {
+			return result, ctx.Err()
+		}
+		if fn == nil {
+			result = append(result, v)
+			continue
+		}
+		result = append(result, fn(v))
+	}
+	return result, nil
 }
 
 // TODO: Send должен ждать, пока out примет value, или пока завершится context.
 // Успешная отправка возвращает nil, отмена — ctx.Err().
 func Send(ctx context.Context, out chan<- int, value int) error {
-	// Ненулевая ошибка не даёт стартовому тесту зависнуть на чтении из пустого
-	// канала. Ученице всё равно нужно заменить эту строку решением через select.
-	return errors.New("TODO: реализуйте Send")
+	select {
+	case out <- value:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // TODO: CollectN должен собрать ровно count значений, поддерживая отмену.
 // При раннем close вернуть частичный результат и ErrClosed; при отмене —
 // частичный результат и ctx.Err(). count <= 0 даёт пустой результат без ошибки.
 func CollectN(ctx context.Context, values <-chan int, count int) ([]int, error) {
-	return []int{}, nil
+	if count <= 0 {
+		return []int{}, nil
+	}
+	result := make([]int, 0)
+	for range count {
+		select {
+		case v, ok := <-values:
+			if !ok {
+				return result, ErrClosed
+			}
+			result = append(result, v)
+		case <-ctx.Done():
+			return result, ctx.Err()
+		}
+	}
+	return result, nil
 }
 
 func Example() string {
