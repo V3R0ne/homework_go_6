@@ -5,31 +5,66 @@ import "fmt"
 // TODO: Map должен применить transform к каждому элементу и вернуть новый []R.
 // Порядок сохраняется; nil и пустой вход дают пустой ненулевой слайс.
 func Map[T any, R any](values []T, transform func(T) R) []R {
-	return []R{}
+	result := make([]R, len(values))
+	for i, v := range values {
+		result[i] = transform(v)
+	}
+	return result
 }
 
 // TODO: Unique должен оставить первое вхождение каждого значения и сохранить порядок.
 // T ограничен comparable, поэтому значения можно использовать как ключи map.
 func Unique[T comparable](values []T) []T {
-	return []T{}
+	mapped := make(map[T]struct{}, len(values))
+	result := make([]T, 0, len(values))
+	for _, v := range values {
+		if _, ok := mapped[v]; ok {
+			continue
+		}
+		mapped[v] = struct{}{}
+		result = append(result, v)
+	}
+	return result
 }
 
 // TODO: Drain (прочитать всё) должен получить значения до закрытия канала
 // и сохранить их порядок. Nil-канал не нужно читать: для него верни
 // пустой ненулевой слайс.
 func Drain[T any](values <-chan T) []T {
-	return []T{}
+	if values == nil {
+		return []T{}
+	}
+	result := make([]T, 0)
+	for v := range values {
+		result = append(result, v)
+	}
+	return result
 }
 
 // TODO: Filter должен вернуть новый слайс только со значениями, для которых
 // keep вернул true. При keep == nil вернуть независимую копию values.
 func Filter[T any](values []T, keep func(T) bool) []T {
-	return []T{}
+	result := make([]T, 0)
+	for _, v := range values {
+		if keep == nil {
+			result = append(result, v)
+			continue
+		}
+		if keep(v) {
+			result = append(result, v)
+		}
+	}
+	return result
 }
 
 // TODO: IndexOf должен вернуть индекс первого target или -1, если target нет.
 // T ограничен comparable, потому что значения сравниваются через ==.
 func IndexOf[T comparable](values []T, target T) int {
+	for i, v := range values {
+		if v == target {
+			return i
+		}
+	}
 	return -1
 }
 
